@@ -7,6 +7,7 @@ import threading
 import time
 import socket
 import platform
+import os
 
 app = Flask(__name__)
 
@@ -22,7 +23,7 @@ def monitor_intel_gpu():
     global gpu_data
     try:
         process = subprocess.Popen(
-            ['sudo', 'intel_gpu_top', '-l'],
+            ['sudo', '/usr/bin/intel_gpu_top', '-l'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -47,13 +48,16 @@ def monitor_intel_gpu():
 
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 
-def get_pm2_logs(lines=20):
+def get_pm2_logs(lines=30):
     try:
+        env_config = os.environ.copy()
+        env_config["PM2_HOME"] = "/root/.pm2"
+        
         output = subprocess.check_output(
-            ['sudo', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
+            ['sudo', 'PM2_HOME=/root/.pm2', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
             text=True, 
             stderr=subprocess.STDOUT,
-            env={"HOME": "/root"} 
+            env=env_config
         )
         return output
     except Exception as e:
