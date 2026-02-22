@@ -54,7 +54,7 @@ def get_pm2_logs(lines=30):
         env_config["PM2_HOME"] = "/root/.pm2"
         
         output = subprocess.check_output(
-            ['sudo', 'PM2_HOME=/root/.pm2', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
+            ['sudo', 'PM2_HOME=/root/.pm2', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines)], 
             text=True, 
             stderr=subprocess.STDOUT,
             env=env_config
