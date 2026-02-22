@@ -1,4 +1,4 @@
-#!/home/rc/server-stats/.venv/bin/python
+#!/home/rc/api-monitoring/.venv/bin/python
 
 from flask import Flask, jsonify
 import psutil
@@ -7,7 +7,6 @@ import threading
 import time
 import socket
 import platform
-import os
 
 app = Flask(__name__)
 
@@ -23,7 +22,7 @@ def monitor_intel_gpu():
     global gpu_data
     try:
         process = subprocess.Popen(
-            ['sudo', '/usr/bin/intel_gpu_top', '-l'],
+            ['sudo', 'intel_gpu_top', '-l'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -47,21 +46,6 @@ def monitor_intel_gpu():
         gpu_data["status"] = f"Error: {str(e)}"
 
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
-
-def get_pm2_logs(lines=30):
-    try:
-        env_config = os.environ.copy()
-        env_config["PM2_HOME"] = "/root/.pm2"
-        
-        output = subprocess.check_output(
-            ['sudo', 'PM2_HOME=/root/.pm2', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines)], 
-            text=True, 
-            stderr=subprocess.STDOUT,
-            env=env_config
-        )
-        return output
-    except Exception as e:
-        return f"Gagal mengambil log PM2: {str(e)}"
 
 def get_system_metrics():
     net_1 = psutil.net_io_counters()
@@ -110,13 +94,6 @@ def get_system_metrics():
 @app.route('/api/status', methods=['GET'])
 def status_endpoint():
     return jsonify(get_system_metrics())
-
-@app.route('/api/logs', methods=['GET'])
-def logs_endpoint():
-    return jsonify({
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "logs": get_pm2_logs(30)
-    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
