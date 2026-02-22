@@ -1,4 +1,4 @@
-#!/home/rc/api-monitoring/.venv/bin/python
+#!/home/rc/server-stats/.venv/bin/python
 
 from flask import Flask, jsonify
 import psutil
@@ -47,6 +47,17 @@ def monitor_intel_gpu():
 
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 
+def get_pm2_logs(lines=20):
+    try:
+        output = subprocess.check_output(
+            ['pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
+            text=True, 
+            stderr=subprocess.STDOUT
+        )
+        return output
+    except Exception as e:
+        return f"Gagal mengambil log PM2: {str(e)}"
+
 def get_system_metrics():
     net_1 = psutil.net_io_counters()
     time.sleep(0.2)
@@ -94,6 +105,13 @@ def get_system_metrics():
 @app.route('/api/status', methods=['GET'])
 def status_endpoint():
     return jsonify(get_system_metrics())
+
+@app.route('/api/logs', methods=['GET'])
+def logs_endpoint():
+    return jsonify({
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "logs": get_pm2_logs(30)
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
