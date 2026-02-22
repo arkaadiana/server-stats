@@ -50,9 +50,10 @@ threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 def get_pm2_logs(lines=20):
     try:
         output = subprocess.check_output(
-            ['pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
+            ['sudo', '/usr/local/bin/pm2', 'logs', '--raw', '--lines', str(lines), '--noprefix'], 
             text=True, 
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
+            env={"HOME": "/root"} 
         )
         return output
     except Exception as e:
