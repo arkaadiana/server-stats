@@ -1,9 +1,12 @@
 #!/home/rc/server-stats/.venv/bin/python
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import system_metrics
 import wifi_manager
 
 app = Flask(__name__)
+
+CORS(app, origins=["http://localhost:3000", "http://192.168.56.1:3000"])
 
 @app.route('/api/status', methods=['GET'])
 def status_endpoint():
@@ -23,4 +26,4 @@ def wifi_connect_endpoint():
     return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000)
