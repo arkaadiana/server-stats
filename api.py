@@ -1,6 +1,5 @@
 #!/home/rc/server-stats/.venv/bin/python
 from flask import Flask, jsonify, request
-
 import system_metrics
 import wifi_manager
 
@@ -18,7 +17,7 @@ def wifi_list_endpoint():
 def wifi_connect_endpoint():
     data = request.json
     if not data or 'ssid' not in data or 'password' not in data:
-        return jsonify({"status": "error", "message": "SSID/Password kosong"}), 400
+        return jsonify({"status": "error", "message": "Missing SSID or Password"}), 400
     
     result = wifi_manager.connect_to_wifi(data['ssid'], data['password'])
     return jsonify(result)

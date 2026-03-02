@@ -39,7 +39,7 @@ def monitor_intel_gpu():
             gpu_data["status"] = "Active"
     except Exception as e:
         gpu_data["status"] = f"Error: {str(e)}"
-        
+
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 
 def get_all_storage():
@@ -63,7 +63,6 @@ def get_full_metrics():
     net_1 = psutil.net_io_counters()
     time.sleep(0.2)
     net_2 = psutil.net_io_counters()
-    
     ram = psutil.virtual_memory()
     
     return {
