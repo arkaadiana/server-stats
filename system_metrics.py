@@ -4,6 +4,8 @@ import threading
 import time
 import socket
 import platform
+import pty
+import os
 
 gpu_data = {
     "model": "Intel HD Graphics",
@@ -16,33 +18,37 @@ gpu_data = {
 def monitor_intel_gpu():
     global gpu_data
     try:
+        master, slave = pty.openpty()
         process = subprocess.Popen(
             ['sudo', 'intel_gpu_top', '-l'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            stdout=slave,
+            stderr=slave,
+            close_fds=True
         )
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            
-            if "PID" in line or "NAME" in line:
-                continue
+        os.close(slave)
+        
+        with os.fdopen(master, 'r') as stdout:
+            for line in iter(stdout.readline, ''):
+                line = line.strip()
                 
-            try:
-                if "Render/3D" in line:
-                    parts = line.split()
-                    if len(parts) > 1:
-                        gpu_data["render_3d_percent"] = float(parts[1].replace('%', ''))
-                elif "Video" in line and "VideoEnhance" not in line:
-                    parts = line.split()
-                    if len(parts) > 1:
-                        gpu_data["video_percent"] = float(parts[1].replace('%', ''))
-                elif " W;" in line:
-                    gpu_data["power_w"] = float(line.split(" W;")[0].split()[-1])
-            except ValueError:
-                pass
-                
-            gpu_data["status"] = "Active"
+                if "PID" in line or "NAME" in line:
+                    continue
+                    
+                try:
+                    if "Render/3D" in line:
+                        parts = line.split()
+                        if len(parts) > 1:
+                            gpu_data["render_3d_percent"] = float(parts[1].replace('%', ''))
+                    elif "Video" in line and "VideoEnhance" not in line:
+                        parts = line.split()
+                        if len(parts) > 1:
+                            gpu_data["video_percent"] = float(parts[1].replace('%', ''))
+                    elif " W;" in line:
+                        gpu_data["power_w"] = float(line.split(" W;")[0].split()[-1])
+                except ValueError:
+                    pass
+                    
+                gpu_data["status"] = "Active"
     except Exception as e:
         gpu_data["status"] = f"Error: {str(e)}"
 
