@@ -26,6 +26,7 @@ gpu_data = {
 def monitor_intel_gpu():
     global gpu_data
 
+    # Cleanup dulu
     subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
     time.sleep(1)
 
@@ -36,65 +37,51 @@ def monitor_intel_gpu():
                 ['sudo', 'intel_gpu_top', '-J'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                bufsize=1
             )
 
-            time.sleep(2)
-            proc.terminate()
-
-            try:
-                output, _ = proc.communicate(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                output, _ = proc.communicate()
-
-            try:
-                subprocess.run(['sudo', 'kill', '-9', str(proc.pid)], capture_output=True)
-            except:
-                pass
-
-            # Parse JSON objects
-            json_objects = []
+            buffer = ""
             brace_count = 0
-            start = None
+            start_idx = None
 
-            for i, ch in enumerate(output):
-                if ch == '{':
-                    if start is None:
-                        start = i
-                    brace_count += 1
-                elif ch == '}':
-                    brace_count -= 1
-                    if brace_count == 0 and start is not None:
-                        json_objects.append(output[start:i+1])
-                        start = None
+            for line in proc.stdout:
+                buffer += line
 
-            if not json_objects:
-                gpu_data["status"] = "No JSON found"
-                time.sleep(1)
-                continue
-
-            data = json.loads(json_objects[-1])
-            engines = data.get("engines", {})
-
-            gpu_data["render_3d_percent"] = round(float(engines.get("Render/3D", {}).get("busy", 0)), 1)
-            gpu_data["video_percent"] = round(float(engines.get("Video", {}).get("busy", 0)), 1)
-            gpu_data["power_w"] = round(float(data.get("power", {}).get("GPU", 0)), 1)
-            gpu_data["status"] = "Active"
+                for i, ch in enumerate(line):
+                    abs_i = len(buffer) - len(line) + i
+                    if ch == '{':
+                        if brace_count == 0:
+                            start_idx = len(buffer) - len(line) + i
+                        brace_count += 1
+                    elif ch == '}':
+                        brace_count -= 1
+                        if brace_count == 0 and start_idx is not None:
+                            json_str = buffer[start_idx:len(buffer) - len(line) + i + 1]
+                            try:
+                                data = json.loads(json_str)
+                                engines = data.get("engines", {})
+                                gpu_data["render_3d_percent"] = round(float(engines.get("Render/3D", {}).get("busy", 0)), 1)
+                                gpu_data["video_percent"] = round(float(engines.get("Video", {}).get("busy", 0)), 1)
+                                gpu_data["power_w"] = round(float(data.get("power", {}).get("GPU", 0)), 1)
+                                gpu_data["status"] = "Active"
+                            except:
+                                pass
+                            buffer = ""
+                            start_idx = None
 
         except Exception as e:
             gpu_data["status"] = f"Error: {str(e)}"
+        finally:
             if proc:
                 try:
                     proc.kill()
                     proc.communicate()
-                    subprocess.run(['sudo', 'kill', '-9', str(proc.pid)], capture_output=True)
                 except:
                     pass
+            subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
 
-        subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
-        time.sleep(1)
-
+        time.sleep(2)
 
 # ===============================
 # CPU TEMP
