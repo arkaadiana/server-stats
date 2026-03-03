@@ -42,6 +42,20 @@ def monitor_intel_gpu():
 
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 
+def get_cpu_temp():
+    try:
+        temps = psutil.sensors_temperatures()
+        if not temps:
+            return None
+        
+        for name in ['coretemp', 'acpitz', 'cpu_thermal']:
+            if name in temps and len(temps[name]) > 0:
+                return temps[name][0].current
+                
+        return list(temps.values())[0][0].current
+    except Exception:
+        return None
+
 def get_all_storage():
     disk = []
     partitions = psutil.disk_partitions(all=False)
@@ -73,7 +87,8 @@ def get_full_metrics():
         },
         "cpu": {
             "usage_percent": psutil.cpu_percent(interval=None),
-            "load_avg": psutil.getloadavg()
+            "load_avg": psutil.getloadavg(),
+            "temp_c": get_cpu_temp()
         },
         "ram": {
             "usage_percent": ram.percent,
