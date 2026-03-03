@@ -28,19 +28,20 @@ def monitor_intel_gpu():
 
     while True:
         try:
-            result = subprocess.run(
-                ['sudo', 'intel_gpu_top', '-J', '-s', '500'],
-                capture_output=True,
-                text=True,
-                timeout=5
+            proc = subprocess.Popen(
+                ['sudo', 'intel_gpu_top', '-J'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
             )
 
-            output = result.stdout
+            time.sleep(2)
+            proc.terminate()
+            output, _ = proc.communicate(timeout=1)
 
-            # Ambil JSON object pertama yang valid (skip karakter "[" di awal)
+            json_objects = []
             brace_count = 0
             start = None
-            json_str = None
 
             for i, ch in enumerate(output):
                 if ch == '{':
@@ -50,29 +51,22 @@ def monitor_intel_gpu():
                 elif ch == '}':
                     brace_count -= 1
                     if brace_count == 0 and start is not None:
-                        json_str = output[start:i+1]
-                        break
+                        json_objects.append(output[start:i+1])
+                        start = None
 
-            if not json_str:
-                gpu_data["status"] = "No valid JSON object found"
+            if not json_objects:
+                gpu_data["status"] = "No JSON found"
                 time.sleep(1)
                 continue
 
-            data = json.loads(json_str)
-
+            data = json.loads(json_objects[-1])
             engines = data.get("engines", {})
-            render = engines.get("Render/3D", {})
-            video = engines.get("Video", {})
 
-            gpu_data["render_3d_percent"] = round(float(render.get("busy", 0)), 1)
-            gpu_data["video_percent"] = round(float(video.get("busy", 0)), 1)
+            gpu_data["render_3d_percent"] = round(float(engines.get("Render/3D", {}).get("busy", 0)), 1)
+            gpu_data["video_percent"] = round(float(engines.get("Video", {}).get("busy", 0)), 1)
             gpu_data["power_w"] = round(float(data.get("power", {}).get("GPU", 0)), 1)
             gpu_data["status"] = "Active"
 
-        except subprocess.TimeoutExpired:
-            gpu_data["status"] = "Timeout"
-        except json.JSONDecodeError as e:
-            gpu_data["status"] = f"JSON Error: {str(e)}"
         except Exception as e:
             gpu_data["status"] = f"Error: {str(e)}"
 
@@ -110,7 +104,6 @@ def get_all_storage():
     for part in partitions:
         try:
             usage = psutil.disk_usage(part.mountpoint)
-
             disk.append({
                 "device": part.device,
                 "mountpoint": part.mountpoint,
@@ -119,7 +112,6 @@ def get_all_storage():
                 "used_gb": round(usage.used / (1024**3), 2),
                 "used_percent": usage.percent
             })
-
         except:
             continue
 
