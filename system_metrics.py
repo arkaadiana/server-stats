@@ -26,7 +26,11 @@ gpu_data = {
 def monitor_intel_gpu():
     global gpu_data
 
+    subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
+    time.sleep(1)
+
     while True:
+        proc = None
         try:
             proc = subprocess.Popen(
                 ['sudo', 'intel_gpu_top', '-J'],
@@ -37,12 +41,19 @@ def monitor_intel_gpu():
 
             time.sleep(2)
             proc.terminate()
+
             try:
                 output, _ = proc.communicate(timeout=3)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 output, _ = proc.communicate()
 
+            try:
+                subprocess.run(['sudo', 'kill', '-9', str(proc.pid)], capture_output=True)
+            except:
+                pass
+
+            # Parse JSON objects
             json_objects = []
             brace_count = 0
             start = None
@@ -73,7 +84,15 @@ def monitor_intel_gpu():
 
         except Exception as e:
             gpu_data["status"] = f"Error: {str(e)}"
+            if proc:
+                try:
+                    proc.kill()
+                    proc.communicate()
+                    subprocess.run(['sudo', 'kill', '-9', str(proc.pid)], capture_output=True)
+                except:
+                    pass
 
+        subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
         time.sleep(1)
 
 
