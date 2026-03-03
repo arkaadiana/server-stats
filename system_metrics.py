@@ -37,7 +37,11 @@ def monitor_intel_gpu():
 
             time.sleep(2)
             proc.terminate()
-            output, _ = proc.communicate(timeout=1)
+            try:
+                output, _ = proc.communicate(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                output, _ = proc.communicate()
 
             json_objects = []
             brace_count = 0
