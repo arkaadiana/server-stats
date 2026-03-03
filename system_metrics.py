@@ -146,7 +146,7 @@ def get_full_metrics():
             "uptime_h": round((time.time() - psutil.boot_time()) / 3600, 1)
         },
         "cpu": {
-            "usage_percent": psutil.cpu_percent(interval=None),
+            "usage_percent": psutil.cpu_percent(interval=0.1),
             "load_avg": psutil.getloadavg(),
             "temp_c": get_cpu_temp()
         },
