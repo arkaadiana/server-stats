@@ -4,7 +4,6 @@ import threading
 import time
 import socket
 import platform
-import re
 import json
 import os
 
@@ -29,27 +28,43 @@ def monitor_intel_gpu():
 
     while True:
         try:
-            result = subprocess.run(
-                ['sudo', 'timeout', '2', 'intel_gpu_top', '-J'],
-                capture_output=True,
+            proc = subprocess.Popen(
+                ['sudo', 'intel_gpu_top', '-J'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True
             )
 
-            output = result.stdout
+            time.sleep(2)
+            proc.terminate()
+            output, _ = proc.communicate(timeout=1)
 
-            render_matches = re.findall(r'"Render/3D/0":\s*\{\s*"busy":\s*([\d\.]+)', output)
-            video_matches = re.findall(r'"Video/0":\s*\{\s*"busy":\s*([\d\.]+)', output)
-            power_matches = re.findall(r'"GPU":\s*\{\s*"value":\s*([\d\.]+)', output)
+            json_objects = []
+            brace_count = 0
+            start = None
 
-            if render_matches:
-                gpu_data["render_3d_percent"] = round(float(render_matches[-1]), 1)
+            for i, ch in enumerate(output):
+                if ch == '{':
+                    if start is None:
+                        start = i
+                    brace_count += 1
+                elif ch == '}':
+                    brace_count -= 1
+                    if brace_count == 0 and start is not None:
+                        json_objects.append(output[start:i+1])
+                        start = None
 
-            if video_matches:
-                gpu_data["video_percent"] = round(float(video_matches[-1]), 1)
+            if not json_objects:
+                gpu_data["status"] = "No JSON found"
+                time.sleep(1)
+                continue
 
-            if power_matches:
-                gpu_data["power_w"] = round(float(power_matches[-1]), 1)
+            data = json.loads(json_objects[-1])
+            engines = data.get("engines", {})
 
+            gpu_data["render_3d_percent"] = round(float(engines.get("Render/3D", {}).get("busy", 0)), 1)
+            gpu_data["video_percent"] = round(float(engines.get("Video", {}).get("busy", 0)), 1)
+            gpu_data["power_w"] = round(float(data.get("power", {}).get("GPU", 0)), 1)
             gpu_data["status"] = "Active"
 
         except Exception as e:
@@ -89,7 +104,6 @@ def get_all_storage():
     for part in partitions:
         try:
             usage = psutil.disk_usage(part.mountpoint)
-
             disk.append({
                 "device": part.device,
                 "mountpoint": part.mountpoint,
@@ -98,7 +112,6 @@ def get_all_storage():
                 "used_gb": round(usage.used / (1024**3), 2),
                 "used_percent": usage.percent
             })
-
         except:
             continue
 
