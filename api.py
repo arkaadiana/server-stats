@@ -8,6 +8,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import system_metrics
 import wifi_manager
+import ssh_monitor
 
 load_dotenv()
 
@@ -72,6 +73,11 @@ def wifi_connect_endpoint():
         return jsonify({"status": "error", "message": "Missing SSID or Password"}), 400
     result = wifi_manager.connect_to_wifi(data['ssid'], data['password'])
     return jsonify(result)
+
+@app.route('/api/ssh/logs', methods=['GET'])
+@token_required
+def ssh_logs_endpoint():
+    return jsonify(ssh_monitor.get_ssh_logs())
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
