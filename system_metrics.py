@@ -7,10 +7,6 @@ import platform
 import json
 import os
 
-# ===============================
-# GLOBAL GPU DATA
-# ===============================
-
 gpu_data = {
     "model": "Intel Integrated Graphics",
     "render_3d_percent": 0.0,
@@ -19,17 +15,11 @@ gpu_data = {
     "status": "Initializing"
 }
 
-# ===============================
-# INTEL GPU MONITOR
-# ===============================
-
 def monitor_intel_gpu():
     global gpu_data
-
-    # Cleanup dulu
     subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
     time.sleep(1)
-
+    
     while True:
         proc = None
         try:
@@ -40,14 +30,13 @@ def monitor_intel_gpu():
                 text=True,
                 bufsize=1
             )
-
+            
             buffer = ""
             brace_count = 0
             start_idx = None
-
+            
             for line in proc.stdout:
                 buffer += line
-
                 for i, ch in enumerate(line):
                     abs_i = len(buffer) - len(line) + i
                     if ch == '{':
@@ -69,7 +58,7 @@ def monitor_intel_gpu():
                                 pass
                             buffer = ""
                             start_idx = None
-
+                            
         except Exception as e:
             gpu_data["status"] = f"Error: {str(e)}"
         finally:
@@ -80,37 +69,24 @@ def monitor_intel_gpu():
                 except:
                     pass
             subprocess.run(['sudo', 'killall', '-9', 'intel_gpu_top'], capture_output=True)
-
+            
         time.sleep(2)
-
-# ===============================
-# CPU TEMP
-# ===============================
 
 def get_cpu_temp():
     try:
         temps = psutil.sensors_temperatures()
         if not temps:
             return None
-
         for name in ['coretemp', 'acpitz', 'cpu_thermal']:
             if name in temps and len(temps[name]) > 0:
                 return temps[name][0].current
-
         return list(temps.values())[0][0].current
-
     except Exception:
         return None
-
-
-# ===============================
-# STORAGE INFO
-# ===============================
 
 def get_all_storage():
     disk = []
     partitions = psutil.disk_partitions(all=False)
-
     for part in partitions:
         try:
             usage = psutil.disk_usage(part.mountpoint)
@@ -124,21 +100,14 @@ def get_all_storage():
             })
         except:
             continue
-
     return disk
-
-
-# ===============================
-# FULL METRICS
-# ===============================
 
 def get_full_metrics():
     net_1 = psutil.net_io_counters()
     time.sleep(0.2)
     net_2 = psutil.net_io_counters()
-
     ram = psutil.virtual_memory()
-
+    
     return {
         "server_info": {
             "hostname": socket.gethostname(),
@@ -146,7 +115,7 @@ def get_full_metrics():
             "uptime_h": round((time.time() - psutil.boot_time()) / 3600, 1)
         },
         "cpu": {
-            "usage_percent": psutil.cpu_percent(interval=0.1),
+            "usage_percent": psutil.cpu_percent(interval=1.0),
             "load_avg": psutil.getloadavg(),
             "temp_c": get_cpu_temp()
         },
@@ -163,17 +132,11 @@ def get_full_metrics():
         "storage": get_all_storage()
     }
 
-
-# ===============================
-# PM2 LOGGER
-# ===============================
-
 def log_for_pm2():
     while True:
         try:
             metrics = get_full_metrics()
             gpu = metrics["intel_gpu"]
-
             log_line = (
                 f"[MONITOR] "
                 f"CPU: {metrics['cpu']['usage_percent']}% | "
@@ -183,29 +146,15 @@ def log_for_pm2():
                 f"Power: {gpu['power_w']}W | "
                 f"GPU Status: {gpu['status']}"
             )
-
             print(log_line, flush=True)
-
         except Exception as e:
             print(f"[MONITOR ERROR] {str(e)}", flush=True)
-
         time.sleep(5)
-
-
-# ===============================
-# START THREADS
-# ===============================
 
 threading.Thread(target=monitor_intel_gpu, daemon=True).start()
 threading.Thread(target=log_for_pm2, daemon=True).start()
 
-
-# ===============================
-# KEEP PROCESS ALIVE
-# ===============================
-
 if __name__ == "__main__":
     print("Server Monitoring Service Started", flush=True)
-
     while True:
         time.sleep(60)

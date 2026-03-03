@@ -5,7 +5,7 @@ from datetime import datetime
 def get_ssh_logs():
     try:
         result = subprocess.run(
-            ['sudo', 'journalctl', '-u', 'ssh', '-n', '1000', '--output=json', '--no-pager'],
+            ['sudo', 'journalctl', '-u', 'ssh', '-n', '100', '--output=json', '--no-pager'],
             capture_output=True, text=True
         )
         
