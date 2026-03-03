@@ -4,6 +4,7 @@ import threading
 import time
 import socket
 import platform
+import json
 
 gpu_data = {
     "model": "Intel HD Graphics",
@@ -17,26 +18,45 @@ def monitor_intel_gpu():
     global gpu_data
     try:
         process = subprocess.Popen(
-            ['sudo', 'intel_gpu_top', '-l'],
+            ['sudo', 'intel_gpu_top', '-J'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
         )
-        for line in iter(process.stdout.readline, ''):
-            line = line.strip()
-            if "Render/3D" in line:
-                parts = line.split()
-                if len(parts) > 1:
-                    gpu_data["render_3d_percent"] = float(parts[1].replace('%', ''))
-            elif "Video" in line and "VideoEnhance" not in line:
-                parts = line.split()
-                if len(parts) > 1:
-                    gpu_data["video_percent"] = float(parts[1].replace('%', ''))
-            elif " W;" in line:
-                try:
-                    gpu_data["power_w"] = float(line.split(" W;")[0].split()[-1])
-                except: pass
-            gpu_data["status"] = "Active"
+        
+        buffer = ""
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+                
+            buffer += line
+            
+            try:
+                if "}" in line and buffer.strip().startswith("{"):
+                    clean_buffer = buffer.strip()
+                    if clean_buffer.endswith(","):
+                        clean_buffer = clean_buffer[:-1]
+                        
+                    data = json.loads(clean_buffer)
+                    
+                    if "engines" in data:
+                        engines = data["engines"]
+                        
+                        if "Render/3D/0" in engines:
+                            gpu_data["render_3d_percent"] = float(engines["Render/3D/0"].get("busy", 0.0))
+                        if "Video/0" in engines:
+                            gpu_data["video_percent"] = float(engines["Video/0"].get("busy", 0.0))
+                            
+                    if "power" in data and "GPU" in data["power"]:
+                        gpu_data["power_w"] = float(data["power"]["GPU"].get("value", 0.0))
+                        
+                    gpu_data["status"] = "Active"
+                    buffer = ""
+                    
+            except json.JSONDecodeError:
+                continue
+                
     except Exception as e:
         gpu_data["status"] = f"Error: {str(e)}"
 
