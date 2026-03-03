@@ -29,7 +29,7 @@ def monitor_intel_gpu():
     while True:
         try:
             result = subprocess.run(
-                ['sudo', 'intel_gpu_top', '-J', '-s', '1'],
+                ['sudo', 'intel_gpu_top', '-J', '-s', '500'],
                 capture_output=True,
                 text=True,
                 timeout=5
