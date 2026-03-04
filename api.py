@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import system_metrics
 import wifi_manager
 import ssh_monitor
+import ai_service
 
 load_dotenv()
 
@@ -19,9 +20,9 @@ DASHBOARD_PASSWORD = os.getenv('DASHBOARD_PASSWORD')
 
 CORS(app, origins=[
     "http://localhost:3000", 
-    "http://192.168.56.1:3000",
-    "https://arkalit.my.id",
-    "https://sys.arkalit.my.id"
+    "[http://192.168.56.1:3000](http://192.168.56.1:3000)",
+    "[https://arkalit.my.id](https://arkalit.my.id)",
+    "[https://sys.arkalit.my.id](https://sys.arkalit.my.id)"
 ])
 
 def token_required(f):
@@ -78,6 +79,27 @@ def wifi_connect_endpoint():
 @token_required
 def ssh_logs_endpoint():
     return jsonify(ssh_monitor.get_ssh_logs())
+
+@app.route('/api/ai/chat', methods=['POST'])
+@token_required
+def ai_chat_endpoint():
+    data = request.json
+    if not data or 'message' not in data:
+        return jsonify({"status": "error", "message": "Pesan tidak boleh kosong"}), 400
+    
+    user_message = data['message']
+    
+    try:
+        current_context = {
+            "system": system_metrics.get_full_metrics(),
+            "wifi": wifi_manager.get_wifi_list(),
+            "ssh_stats": ssh_monitor.get_ssh_logs().get("stats", {})
+        }
+    except Exception as e:
+        current_context = {"error": f"Gagal mengambil metrik: {str(e)}"}
+
+    hersi_response = ai_service.process_hersi_request(user_message, current_context)
+    return jsonify(hersi_response)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
