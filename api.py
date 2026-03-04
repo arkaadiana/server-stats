@@ -89,7 +89,10 @@ def ai_chat_endpoint():
     
     user_message = data['message']
     
+    print(f"\n[HersiAI] 💬 Menerima pesan dari Arka: '{user_message}'", flush=True)
+    
     try:
+        print("[HersiAI] 🔍 Memindai data metrik server...", flush=True)
         current_context = {
             "system": system_metrics.get_full_metrics(),
             "wifi": wifi_manager.get_wifi_list(),
@@ -97,8 +100,13 @@ def ai_chat_endpoint():
         }
     except Exception as e:
         current_context = {"error": f"Gagal mengambil metrik: {str(e)}"}
+        print(f"[HersiAI] ⚠️ Error ambil konteks: {e}", flush=True)
 
+    print("[HersiAI] 🧠 Mengirim konteks ke Gemini API (Menunggu balasan)...", flush=True)
     hersi_response = ai_service.process_hersi_request(user_message, current_context)
+    
+    print(f"[HersiAI] ✅ Selesai! Balasan: '{hersi_response.get('reply')}'\n", flush=True)
+    
     return jsonify(hersi_response)
 
 if __name__ == '__main__':
