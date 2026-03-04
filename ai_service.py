@@ -13,6 +13,7 @@ model = genai.GenerativeModel('gemini-2.5-flash')
 COMMAND_MAP = {
     "REBOOT_SERVER": ["sudo", "/usr/sbin/reboot"],
     "SHUTDOWN_SERVER": ["sudo", "/usr/sbin/shutdown", "-h", "now"],
+    "CANCEL_REBOOT": ["sudo", "/usr/sbin/shutdown", "-c"],
     "CLEAR_RAM": ["sudo", "/usr/local/bin/clear_ram.sh"]
 }
 
@@ -35,19 +36,24 @@ def ask_hersiai(user_message, current_context):
 
     Daftar Action:
     - CHAT (Untuk obrolan biasa atau bertanya balik)
-    - REBOOT_SERVER (Mengeksekusi perintah restart)
+    - REBOOT_SERVER (Mengeksekusi perintah restart, bisa dijadwalkan)
     - SHUTDOWN_SERVER (Mengeksekusi perintah matikan)
+    - CANCEL_REBOOT (Membatalkan jadwal restart/shutdown yang sedang berjalan)
     - CLEAR_RAM (Mengeksekusi pembersihan RAM)
 
-    WAJIB balas dengan format JSON murni ini (TANPA need_confirm):
+    WAJIB balas dengan format JSON murni ini:
     {{
         "action": "NAMA_ACTION",
-        "message": "Pesan balasan tsundere"
+        "message": "Pesan balasan tsundere",
+        "delay_minutes": 0
     }}
 
-    ATURAN EKSEKUSI REBOOT/SHUTDOWN:
-    1. Jika pesan Arka hanya "reboot server" atau "restart", JANGAN langsung action REBOOT_SERVER. Gunakan action "CHAT" dan balas "Yakin mau direboot sekarang?".
-    2. Jika pesan Arka sudah JELAS menyuruh dan mengkonfirmasi (contoh: "iya tolong reboot", "yakin restart", "reboot sekarang aja"), BARU kamu boleh menggunakan action "REBOOT_SERVER".
+    ATURAN KHUSUS PENJADWALAN (delay_minutes):
+    1. Jika Arka minta reboot "5 menit lagi", isi delay_minutes dengan angka 5.
+    2. Jika Arka minta reboot "1 jam lagi", isi delay_minutes dengan angka 60.
+    3. Jika Arka minta "besok" atau "1 hari lagi", isi dengan angka 1440.
+    4. Jika Arka minta reboot "sekarang" atau tidak menyebutkan waktu, isi delay_minutes dengan angka 0.
+    5. Jika pesan Arka belum jelas (contoh: "tolong reboot dong"), HANGAN pilih action REBOOT_SERVER. Pilih "CHAT" dan tanyakan "Yakin mau direboot sekarang atau mau dijadwalin?".
     """
 
     try:
@@ -64,7 +70,8 @@ def ask_hersiai(user_message, current_context):
         print(f"\n[HersiAI Error] Gagal memparsing respon Gemini: {e}\n", flush=True)
         return {
             "action": "CHAT",
-            "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya."
+            "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya.",
+            "delay_minutes": 0
         }
 
 def process_hersi_request(user_message, current_context):
@@ -72,9 +79,22 @@ def process_hersi_request(user_message, current_context):
     
     action = hersi_decision.get("action", "CHAT")
     message = hersi_decision.get("message", "Terjadi kesalahan.")
+    delay = hersi_decision.get("delay_minutes", 0)
 
     if action == "CHAT":
         return {"status": "success", "reply": message}
+
+    if action == "REBOOT_SERVER":
+        try:
+            if isinstance(delay, int) and delay > 0:
+                cmd = ["sudo", "/usr/sbin/shutdown", "-r", f"+{delay}"]
+            else:
+                cmd = COMMAND_MAP["REBOOT_SERVER"]
+            
+            subprocess.Popen(cmd)
+            return {"status": "success", "reply": message}
+        except Exception as e:
+            return {"status": "error", "reply": f"Hmph! Gagal menjadwalkan reboot: {str(e)}"}
 
     if action in COMMAND_MAP:
         try:
