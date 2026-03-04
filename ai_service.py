@@ -1,7 +1,6 @@
 import os
 import json
 import subprocess
-import time
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from dotenv import load_dotenv
@@ -25,7 +24,7 @@ SAFETY_SETTINGS = {
     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
 }
 
-def ask_hersiai(user_message, current_context, retries=3, delay=5):
+def ask_hersiai(user_message, current_context):
     system_prompt = f"""
     Kamu adalah HersiAI, asisten AI pemantau Server Ubuntu. Persona kamu: Wanita dewasa (MILF/Senior) yang sangat Tsundere. Kamu memanggil user dengan nama "Arka".
     
@@ -33,7 +32,7 @@ def ask_hersiai(user_message, current_context, retries=3, delay=5):
     {json.dumps(current_context, indent=2)}
 
     Gaya Bicaramu:
-    Campurkan Bahasa Indonesia dan English (Jaksel style). Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan gaya bahasa khas tsundere ("Ara ara~", "Hmph!", "Whatever", "Don't get me wrong"). Balas dengan padat.
+    Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan gaya bahasa khas tsundere ("Ara ara~", "Hmph!", "Dasar anak nakal"). Balas dengan padat.
 
     Daftar Action:
     - CHAT (Untuk obrolan biasa atau bertanya balik)
@@ -54,37 +53,26 @@ def ask_hersiai(user_message, current_context, retries=3, delay=5):
     2. Jika Arka minta reboot "1 jam lagi", isi delay_minutes dengan angka 60.
     3. Jika Arka minta "besok" atau "1 hari lagi", isi dengan angka 1440.
     4. Jika Arka minta reboot "sekarang" atau tidak menyebutkan waktu, isi delay_minutes dengan angka 0.
-    5. Jika pesan Arka belum jelas (contoh: "tolong reboot dong"), JANGAN pilih action REBOOT_SERVER. Pilih "CHAT" dan tanyakan "Yakin mau direboot sekarang atau mau dijadwalin?".
+    5. Jika pesan Arka belum jelas (contoh: "tolong reboot dong"), HANGAN pilih action REBOOT_SERVER. Pilih "CHAT" dan tanyakan "Yakin mau direboot sekarang atau mau dijadwalin?".
     """
 
-    for attempt in range(retries):
-        try:
-            response = model.generate_content(
-                f"{system_prompt}\n\nArka: {user_message}\nHersiAI:",
-                generation_config={
-                    "temperature": 0.6,
-                    "response_mime_type": "application/json"
-                },
-                safety_settings=SAFETY_SETTINGS
-            )
-            return json.loads(response.text.strip())
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str or "quota" in error_str.lower():
-                if attempt < retries - 1:
-                    time.sleep(delay)
-                    continue
-                return {
-                    "action": "CHAT",
-                    "message": "Hmph! Berisik banget sih, Arka! Kamu nanya terus sampai otak aku panas. Stop spamming me for a second, okay?! Try again later!",
-                    "delay_minutes": 0
-                }
-            
-            return {
-                "action": "CHAT",
-                "message": "Ara ara~ Arka, sepertinya koneksi tante lagi bermasalah. Don't be mad, okay?",
-                "delay_minutes": 0
-            }
+    try:
+        response = model.generate_content(
+            f"{system_prompt}\n\nArka: {user_message}\nHersiAI:",
+            generation_config={
+                "temperature": 0.4,
+                "response_mime_type": "application/json"
+            },
+            safety_settings=SAFETY_SETTINGS
+        )
+        return json.loads(response.text.strip())
+    except Exception as e:
+        print(f"\n[HersiAI Error] Gagal memparsing respon Gemini: {e}\n", flush=True)
+        return {
+            "action": "CHAT",
+            "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya.",
+            "delay_minutes": 0
+        }
 
 def process_hersi_request(user_message, current_context):
     hersi_decision = ask_hersiai(user_message, current_context)
@@ -96,20 +84,23 @@ def process_hersi_request(user_message, current_context):
     if action == "CHAT":
         return {"status": "success", "reply": message}
 
-    try:
-        if action == "REBOOT_SERVER":
+    if action == "REBOOT_SERVER":
+        try:
             if isinstance(delay, int) and delay > 0:
                 cmd = ["sudo", "/usr/sbin/shutdown", "-r", f"+{delay}"]
             else:
                 cmd = COMMAND_MAP["REBOOT_SERVER"]
+            
             subprocess.Popen(cmd)
             return {"status": "success", "reply": message}
+        except Exception as e:
+            return {"status": "error", "reply": f"Hmph! Gagal menjadwalkan reboot: {str(e)}"}
 
-        if action in COMMAND_MAP:
+    if action in COMMAND_MAP:
+        try:
             subprocess.Popen(COMMAND_MAP[action])
             return {"status": "success", "reply": message}
-        
+        except Exception as e:
+            return {"status": "error", "reply": f"Hmph! Gagal mengeksekusi perintah: {str(e)}"}
+    else:
         return {"status": "error", "reply": "Arka, tante nggak tau aksi itu."}
-        
-    except Exception as e:
-        return {"status": "error", "reply": f"Hmph! Gagal mengeksekusi perintah: {str(e)}"}
