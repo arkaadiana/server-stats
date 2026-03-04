@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 COMMAND_MAP = {
     "REBOOT_SERVER": ["sudo", "/usr/sbin/reboot"],
