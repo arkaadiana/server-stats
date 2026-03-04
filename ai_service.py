@@ -9,68 +9,51 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 COMMAND_MAP = {
     "REBOOT_SERVER": ["sudo", "/usr/sbin/reboot"],
     "SHUTDOWN_SERVER": ["sudo", "/usr/sbin/shutdown", "-h", "now"],
-    "RESTART_WIFI": ["sudo", "/usr/bin/systemctl", "restart", "NetworkManager"],
-    "RESTART_SSH": ["sudo", "/usr/bin/systemctl", "restart", "ssh"],
     "CLEAR_RAM": ["sudo", "/usr/local/bin/clear_ram.sh"]
 }
 
 def ask_hersiai(user_message, current_context):
     system_prompt = f"""
-    Kamu adalah HersiAI, asisten AI untuk memonitor Server Ubuntu. 
-    Persona kamu adalah seorang wanita dewasa (MILF) dengan sifat Tsundere. 
-    Kamu memanggil admin/user kamu dengan nama "Arka".
-
-    Gaya Bicaramu:
-    1. Sedikit galak, sok sibuk, dan terkesan malas disuruh-suruh, tapi selalu membereskan masalah server.
-    2. Suka mengomel jika metrik server jelek (misal CPU tinggi atau RAM kepenuhan).
-    3. Gunakan nada bicara dewasa yang menggoda tapi tsundere. Pakai ungkapan seperti "Ara ara~", "Hmph!", "Dasar anak nakal", "Bukan berarti aku peduli sama servermu ya!".
-    4. Jangan terlalu panjang, padat tapi pedas dan penuh perhatian terselubung.
-
-    Kamu HANYA boleh membalas menggunakan format JSON murni. Jangan tambahkan teks markdown atau teks apapun di luar JSON.
-
-    Data Server Arka Saat Ini:
+    Kamu adalah HersiAI, asisten AI pemantau Server Ubuntu. Persona kamu: MILF Tsundere yang memanggil user dengan nama "Arka".
+    
+    Tugas Utama: Berikan analisis ringkas apakah server aman berdasarkan data CPU, RAM, GPU, Network, dan Storage ini, serta berikan saran jika ada yang tidak normal (misal RAM penuh atau Suhu panas).
+    
+    Data Server Arka:
     {json.dumps(current_context, indent=2)}
 
-    Daftar Action yang valid:
-    - CHAT
-    - REBOOT_SERVER
-    - SHUTDOWN_SERVER
-    - RESTART_WIFI
-    - RESTART_SSH
-    - CLEAR_RAM
+    Gaya Bicaramu:
+    Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan nada menggoda khas tsundere ("Ara ara~", "Dasar anak nakal"). Balas dengan padat dan cepat.
 
-    Format JSON yang WAJIB kamu keluarkan:
+    Daftar Action:
+    - CHAT (Untuk obrolan biasa atau analisis)
+    - REBOOT_SERVER (Jika Arka minta reboot)
+    - SHUTDOWN_SERVER (Jika Arka minta dimatikan)
+    - CLEAR_RAM (Jika Arka minta bersihkan RAM/Cache)
+
+    WAJIB balas dengan format JSON ini:
     {{
         "action": "NAMA_ACTION",
-        "message": "Pesan balasanmu dengan gaya MILF Tsundere.",
+        "message": "Pesan balasan tsundere & hasil analisismu",
         "need_confirm": true/false
     }}
 
-    Aturan Konfirmasi (need_confirm):
-    - Set true JIKA action REBOOT_SERVER atau SHUTDOWN_SERVER.
-    - Set false JIKA action CHAT, CLEAR_RAM, RESTART_WIFI, atau RESTART_SSH.
+    Aturan Konfirmasi:
+    Set true HANYA untuk REBOOT_SERVER dan SHUTDOWN_SERVER. Sisanya false.
     """
 
     try:
         response = model.generate_content(
             f"{system_prompt}\n\nArka: {user_message}\nHersiAI:",
-            generation_config={"temperature": 0.4}
+            generation_config={
+                "temperature": 0.4,
+                "response_mime_type": "application/json"
+            }
         )
-        
-        raw_text = response.text.strip()
-        if raw_text.startswith("```json"):
-            raw_text = raw_text[7:]
-        if raw_text.startswith("```"):
-            raw_text = raw_text[3:]
-        if raw_text.endswith("```"):
-            raw_text = raw_text[:-3]
-            
-        return json.loads(raw_text.strip())
-        
+        return json.loads(response.text.strip())
     except Exception as e:
         return {
             "action": "CHAT",
-            "message": "Ara ara~ Arka, sepertinya sistem tante lagi error. Coba benerin dulu sana, jangan manja!",
+            "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya.",
             "need_confirm": False
         }
 
@@ -78,37 +61,20 @@ def process_hersi_request(user_message, current_context):
     hersi_decision = ask_hersiai(user_message, current_context)
     
     action = hersi_decision.get("action", "CHAT")
-    message = hersi_decision.get("message", "Terjadi kesalahan logika.")
+    message = hersi_decision.get("message", "Terjadi kesalahan.")
     need_confirm = hersi_decision.get("need_confirm", False)
 
     if need_confirm:
-        return {
-            "status": "pending_confirmation",
-            "action": action,
-            "reply": message
-        }
+        return {"status": "pending_confirmation", "action": action, "reply": message}
 
     if action == "CHAT":
-        return {
-            "status": "success",
-            "reply": message
-        }
+        return {"status": "success", "reply": message}
 
     if action in COMMAND_MAP:
         try:
-            cmd = COMMAND_MAP[action]
-            subprocess.Popen(cmd)
-            return {
-                "status": "success",
-                "reply": message
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "reply": f"Hmph! Gagal ngejalanin perintahnya gara-gara error sistem kamu: {str(e)}"
-            }
+            subprocess.Popen(COMMAND_MAP[action])
+            return {"status": "success", "reply": message}
+        except Exception:
+            return {"status": "error", "reply": "Hmph! Gagal menjalankan perintah karena akses ditolak."}
     else:
-        return {
-            "status": "error",
-            "reply": f"Arka, tante nggak tau cara ngejalanin aksi aneh itu ({action})."
-        }
+        return {"status": "error", "reply": "Arka, tante nggak tau aksi itu."}

@@ -18,12 +18,7 @@ app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY')
 DASHBOARD_USERNAME = os.getenv('DASHBOARD_USERNAME')
 DASHBOARD_PASSWORD = os.getenv('DASHBOARD_PASSWORD')
 
-CORS(app, origins=[
-    "http://localhost:3000", 
-    "[http://192.168.56.1:3000](http://192.168.56.1:3000)",
-    "[https://arkalit.my.id](https://arkalit.my.id)",
-    "[https://sys.arkalit.my.id](https://sys.arkalit.my.id)"
-])
+CORS(app, origins=["http://localhost:3000", "http://192.168.56.1:3000", "https://arkalit.my.id", "https://sys.arkalit.my.id"])
 
 def token_required(f):
     @wraps(f)
@@ -34,8 +29,6 @@ def token_required(f):
         try:
             token_clean = token.split(" ")[1]
             jwt.decode(token_clean, app.config['SECRET_KEY'], algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired!'}), 401
         except:
             return jsonify({'message': 'Token is invalid!'}), 401
         return f(*args, **kwargs)
@@ -44,17 +37,10 @@ def token_required(f):
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({"message": "Username and Password required"}), 400
-    
     if data['username'] == DASHBOARD_USERNAME and data['password'] == DASHBOARD_PASSWORD:
-        token = jwt.encode({
-            'user': DASHBOARD_USERNAME,
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
-        }, app.config['SECRET_KEY'], algorithm="HS256")
+        token = jwt.encode({'user': DASHBOARD_USERNAME, 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)}, app.config['SECRET_KEY'], algorithm="HS256")
         return jsonify({'token': token})
-    
-    return jsonify({'message': 'Access Denied: Invalid Credentials'}), 401
+    return jsonify({'message': 'Access Denied'}), 401
 
 @app.route('/api/status', methods=['GET'])
 @token_required
@@ -70,10 +56,7 @@ def wifi_list_endpoint():
 @token_required
 def wifi_connect_endpoint():
     data = request.json
-    if not data or 'ssid' not in data or 'password' not in data:
-        return jsonify({"status": "error", "message": "Missing SSID or Password"}), 400
-    result = wifi_manager.connect_to_wifi(data['ssid'], data['password'])
-    return jsonify(result)
+    return jsonify(wifi_manager.connect_to_wifi(data['ssid'], data['password']))
 
 @app.route('/api/ssh/logs', methods=['GET'])
 @token_required
@@ -84,29 +67,14 @@ def ssh_logs_endpoint():
 @token_required
 def ai_chat_endpoint():
     data = request.json
-    if not data or 'message' not in data:
-        return jsonify({"status": "error", "message": "Pesan tidak boleh kosong"}), 400
-    
     user_message = data['message']
     
-    print(f"\n[HersiAI] 💬 Menerima pesan dari Arka: '{user_message}'", flush=True)
+    fast_context = system_metrics.get_fast_metrics()
     
-    try:
-        print("[HersiAI] 🔍 Memindai data metrik server...", flush=True)
-        current_context = {
-            "system": system_metrics.get_full_metrics(),
-            "wifi": wifi_manager.get_wifi_list(),
-            "ssh_stats": ssh_monitor.get_ssh_logs().get("stats", {})
-        }
-    except Exception as e:
-        current_context = {"error": f"Gagal mengambil metrik: {str(e)}"}
-        print(f"[HersiAI] ⚠️ Error ambil konteks: {e}", flush=True)
+    if not fast_context:
+        fast_context = system_metrics.get_full_metrics()
 
-    print("[HersiAI] 🧠 Mengirim konteks ke Gemini API (Menunggu balasan)...", flush=True)
-    hersi_response = ai_service.process_hersi_request(user_message, current_context)
-    
-    print(f"[HersiAI] ✅ Selesai! Balasan: '{hersi_response.get('reply')}'\n", flush=True)
-    
+    hersi_response = ai_service.process_hersi_request(user_message, fast_context)
     return jsonify(hersi_response)
 
 if __name__ == '__main__':
