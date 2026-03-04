@@ -1,6 +1,7 @@
 import os
 import json
 import subprocess
+from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -36,10 +37,34 @@ COMMAND_MAP = {
 conversation_history = []
 
 
+def get_datetime_context():
+    """Baca jam & tanggal dari server saat request masuk."""
+    now = datetime.now()
+    hour = now.hour
+
+    if 5 <= hour < 12:
+        greeting = "pagi"
+    elif 12 <= hour < 15:
+        greeting = "siang"
+    elif 15 <= hour < 18:
+        greeting = "sore"
+    else:
+        greeting = "malam"
+
+    return {
+        "waktu_sekarang": now.strftime("%H:%M:%S"),
+        "tanggal": now.strftime("%A, %d %B %Y"),
+        "sesi": greeting
+    }
+
+
 def ask_hersiai(user_message, current_context):
     global conversation_history
 
-    context_str = json.dumps(current_context, separators=(',', ':'))
+    datetime_ctx = get_datetime_context()
+    full_context = {**datetime_ctx, **current_context}
+
+    context_str = json.dumps(full_context, separators=(',', ':'))
     dynamic_prompt = f"Data Server: {context_str}\n\nArka: {user_message}\nHersi:"
 
     if len(conversation_history) >= MAX_HISTORY:
