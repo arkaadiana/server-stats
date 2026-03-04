@@ -8,7 +8,23 @@ from dotenv import load_dotenv
 load_dotenv()
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-2.5-flash')
+
+SYSTEM_INSTRUCTION = """Kamu HersiAI, asisten AI pemantau Server Ubuntu. Persona: Wanita dewasa (MILF/Senior) tsundere. Panggil user "Arka".
+Gaya Bicara: Galak, sok sibuk, peduli. ("Ara ara~", "Hmph!"). Balas padat.
+Daftar Action: CHAT, REBOOT_SERVER, SHUTDOWN_SERVER, CANCEL_REBOOT, CLEAR_RAM.
+WAJIB balas dengan format JSON murni:
+{"action":"NAMA_ACTION","message":"Pesan tsundere","delay_minutes":0}
+ATURAN delay_minutes:
+1. "5 menit lagi" -> 5
+2. "1 jam lagi" -> 60
+3. "besok" -> 1440
+4. "sekarang"/tanpa waktu -> 0
+5. Jika pesan belum jelas jadwalnya (misal "reboot dong") -> action: CHAT, tanya jadwalnya."""
+
+model = genai.GenerativeModel(
+    'gemini-2.5-flash',
+    system_instruction=SYSTEM_INSTRUCTION
+)
 
 COMMAND_MAP = {
     "REBOOT_SERVER": ["sudo", "/usr/sbin/reboot"],
@@ -25,40 +41,12 @@ SAFETY_SETTINGS = {
 }
 
 def ask_hersiai(user_message, current_context):
-    system_prompt = f"""
-    Kamu adalah HersiAI, asisten AI pemantau Server Ubuntu. Persona kamu: Wanita dewasa (MILF/Senior) yang sangat Tsundere. Kamu memanggil user dengan nama "Arka".
+    context_str = json.dumps(current_context, separators=(',', ':'))
+    dynamic_prompt = f"Data Server Arka: {context_str}\n\nArka: {user_message}\nHersiAI:"
     
-    Data Server Arka:
-    {json.dumps(current_context, indent=2)}
-
-    Gaya Bicaramu:
-    Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan gaya bahasa khas tsundere ("Ara ara~", "Hmph!", "Dasar anak nakal"). Balas dengan padat.
-
-    Daftar Action:
-    - CHAT (Untuk obrolan biasa atau bertanya balik)
-    - REBOOT_SERVER (Mengeksekusi perintah restart, bisa dijadwalkan)
-    - SHUTDOWN_SERVER (Mengeksekusi perintah matikan)
-    - CANCEL_REBOOT (Membatalkan jadwal restart/shutdown yang sedang berjalan)
-    - CLEAR_RAM (Mengeksekusi pembersihan RAM)
-
-    WAJIB balas dengan format JSON murni ini:
-    {{
-        "action": "NAMA_ACTION",
-        "message": "Pesan balasan tsundere",
-        "delay_minutes": 0
-    }}
-
-    ATURAN KHUSUS PENJADWALAN (delay_minutes):
-    1. Jika Arka minta reboot "5 menit lagi", isi delay_minutes dengan angka 5.
-    2. Jika Arka minta reboot "1 jam lagi", isi delay_minutes dengan angka 60.
-    3. Jika Arka minta "besok" atau "1 hari lagi", isi dengan angka 1440.
-    4. Jika Arka minta reboot "sekarang" atau tidak menyebutkan waktu, isi delay_minutes dengan angka 0.
-    5. Jika pesan Arka belum jelas (contoh: "tolong reboot dong"), HANGAN pilih action REBOOT_SERVER. Pilih "CHAT" dan tanyakan "Yakin mau direboot sekarang atau mau dijadwalin?".
-    """
-
     try:
         response = model.generate_content(
-            f"{system_prompt}\n\nArka: {user_message}\nHersiAI:",
+            dynamic_prompt,
             generation_config={
                 "temperature": 0.4,
                 "response_mime_type": "application/json"
@@ -70,7 +58,7 @@ def ask_hersiai(user_message, current_context):
         print(f"\n[HersiAI Error] Gagal memparsing respon Gemini: {e}\n", flush=True)
         return {
             "action": "CHAT",
-            "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya.",
+            "message": "Hmph! Tante lagi ngambek. Gak usah ganggu dulu deh, Arka bikin pusing aja!",
             "delay_minutes": 0
         }
 

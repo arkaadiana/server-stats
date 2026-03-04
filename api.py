@@ -1,4 +1,3 @@
-#!/home/rc/server-stats/.venv/bin/python
 import os
 import jwt
 import datetime
