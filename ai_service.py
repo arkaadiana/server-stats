@@ -2,6 +2,7 @@ import os
 import json
 import subprocess
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-1.5-flash')
@@ -12,9 +13,16 @@ COMMAND_MAP = {
     "CLEAR_RAM": ["sudo", "/usr/local/bin/clear_ram.sh"]
 }
 
+SAFETY_SETTINGS = {
+    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+}
+
 def ask_hersiai(user_message, current_context):
     system_prompt = f"""
-    Kamu adalah HersiAI, asisten AI pemantau Server Ubuntu. Persona kamu: MILF Tsundere yang memanggil user dengan nama "Arka".
+    Kamu adalah HersiAI, asisten AI pemantau Server Ubuntu. Persona kamu: Wanita dewasa (Tante/Senior) yang sangat Tsundere. Kamu memanggil user dengan nama "Arka".
     
     Tugas Utama: Berikan analisis ringkas apakah server aman berdasarkan data CPU, RAM, GPU, Network, dan Storage ini, serta berikan saran jika ada yang tidak normal (misal RAM penuh atau Suhu panas).
     
@@ -22,7 +30,7 @@ def ask_hersiai(user_message, current_context):
     {json.dumps(current_context, indent=2)}
 
     Gaya Bicaramu:
-    Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan nada menggoda khas tsundere ("Ara ara~", "Dasar anak nakal"). Balas dengan padat dan cepat.
+    Sedikit galak, sok sibuk, tapi selalu memastikan server Arka aman. Gunakan gaya bahasa khas tsundere ("Ara ara~", "Hmph!", "Dasar anak nakal"). Balas dengan padat dan cepat.
 
     Daftar Action:
     - CHAT (Untuk obrolan biasa atau analisis)
@@ -30,7 +38,7 @@ def ask_hersiai(user_message, current_context):
     - SHUTDOWN_SERVER (Jika Arka minta dimatikan)
     - CLEAR_RAM (Jika Arka minta bersihkan RAM/Cache)
 
-    WAJIB balas dengan format JSON ini:
+    WAJIB balas dengan format JSON murni ini:
     {{
         "action": "NAMA_ACTION",
         "message": "Pesan balasan tsundere & hasil analisismu",
@@ -47,10 +55,12 @@ def ask_hersiai(user_message, current_context):
             generation_config={
                 "temperature": 0.4,
                 "response_mime_type": "application/json"
-            }
+            },
+            safety_settings=SAFETY_SETTINGS
         )
         return json.loads(response.text.strip())
     except Exception as e:
+        print(f"\n[HersiAI Error] Gagal memparsing respon Gemini: {e}\n", flush=True)
         return {
             "action": "CHAT",
             "message": "Ara ara~ Arka, sepertinya otak tante lagi pusing memproses datanya.",
