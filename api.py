@@ -81,11 +81,12 @@ def ai_chat_endpoint():
 def public_ai_chat_endpoint():
     data = request.json
     user_message = data.get('message', '')
+    session_id = data.get('session_id', request.remote_addr)
     
     if not user_message:
         return jsonify({"message": "Mau ngomong apa?", "expression": "qizi1"}), 400
 
-    hersi_response = public_ai_service.process_public_chat(user_message)
+    hersi_response = public_ai_service.process_public_chat(user_message, session_id)
     return jsonify(hersi_response)
 
 if __name__ == '__main__':
