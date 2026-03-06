@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 import system_metrics
 import wifi_manager
 import ssh_monitor
-import ai_service
-import public_ai_service
+
+import hersi_server
 
 load_dotenv()
 
@@ -74,7 +74,7 @@ def ai_chat_endpoint():
     if not fast_context:
         fast_context = system_metrics.get_full_metrics()
 
-    hersi_response = ai_service.process_hersi_request(user_message, fast_context)
+    hersi_response = hersi_server.process_hersi_request(user_message, fast_context)
     return jsonify(hersi_response)
 
 @app.route('/api/ai/public-chat', methods=['POST'])
@@ -86,7 +86,7 @@ def public_ai_chat_endpoint():
     if not user_message:
         return jsonify({"message": "Mau ngomong apa?", "expression": "qizi1"}), 400
 
-    hersi_response = public_ai_service.process_public_chat(user_message, session_id)
+    hersi_response = hersi_server.process_public_chat(user_message, session_id)
     return jsonify(hersi_response)
 
 if __name__ == '__main__':
